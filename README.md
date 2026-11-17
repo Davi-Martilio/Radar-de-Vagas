@@ -24,7 +24,7 @@ Você envia o currículo, informa cidade e preferências, e uma IA procura em 14
 
 ## Limites do plano gratuito
 - Os limites mudam com o tempo e dependem do modelo e da conta. Veja os valores atuais em **aistudio.google.com**, na tela de limites de uso.
-- Cada busca faz 3 chamadas (5 portais por chamada), com pausa entre elas. Cada mensagem do assistente faz mais 1 chamada.
+- Cada busca faz 4 chamadas (4 portais por chamada). A IA escolhe palavras-chave a partir do currículo, busca em cada portal e abre a página de cada vaga para conferir antes de listar. Cada mensagem do assistente faz mais 1 chamada.
 - Se o limite do dia acabar, os portais aparecem como "Não foi possível verificar". Tente de novo no dia seguinte.
 
 ## Privacidade
@@ -32,6 +32,7 @@ Você envia o currículo, informa cidade e preferências, e uma IA procura em 14
 - O currículo passa pelo seu Worker e pela API do Google. Perfil e currículo também ficam no `localStorage` do navegador.
 
 ## Limites da busca
+- Portais que bloqueiam a leitura automática (login, proteção contra robôs) não têm vagas conferidas. Nesses casos a linha do portal explica o motivo. Não há como contornar isso de forma legítima.
 - A IA só vê o que a busca do Google indexa. Portais que carregam vagas só por JavaScript ou exigem login podem trazer poucos resultados.
 - Os logos vêm do serviço de favicons do Google. Se um não carregar, aparece a inicial do portal.
 - A compatibilidade é uma estimativa da IA, e as vagas podem ter sido encerradas. Confira no site antes de se candidatar.
@@ -39,7 +40,8 @@ Você envia o currículo, informa cidade e preferências, e uma IA procura em 14
 ## Se aparecer "Não foi possível verificar"
 A linha do portal mostra o motivo. Os mais comuns:
 - **Sem conexão com o servidor:** `API_URL` errado, ou a página aberta como arquivo local. Abra pelo endereço do GitHub Pages.
-- **Origem não permitida:** `ALLOWED_ORIGIN` diferente do endereço da página (sem barra no final).
+- **Origem não permitida:** `ALLOWED_ORIGIN` diferente do endereço da página (sem barra no final). Para testar localmente com o Live Server, use duas origens separadas por vírgula: `https://seu-usuario.github.io,http://127.0.0.1:5500`. Abrir o arquivo direto (origem `null`) nunca é aceito.
+- **Erro 524 ou "demorou demais":** o Gemini estava lento. Tente de novo; o Worker já usa limite de tempo e modelo de reserva.
 - **Gemini (400/403):** chave errada ou sem permissão. Gere outra no AI Studio e atualize `GEMINI_API_KEY`.
 - **Limite gratuito atingido:** espere ou tente no dia seguinte. Você pode trocar `MODEL` por outro modelo com cota maior no AI Studio.
 - **Resposta fora do formato:** tente de novo.
