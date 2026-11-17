@@ -1,59 +1,57 @@
-// Cloudflare Worker — ponte entre a página e a API gratuita do Google Gemini.
-// Variáveis: GEMINI_API_KEY (secret), ALLOWED_ORIGIN (várias separadas por vírgula),
-// MODEL (padrão gemini-3.8-flash), FALLBACK_MODEL, CHAT_MODEL (opcionais).
+// Cloudflare Worker — ponte entre a página e a API do Google Gemini (sem busca na web).
+// Variáveis: GEMINI_API_KEY (secret), ALLOWED_ORIGIN (várias separadas por vírgula), MODEL (padrão gemini-3.8-flash).
 
-const SEARCH = `Você é um recrutador sênior que avalia currículos e verifica vagas reais.
-Passo 1: entenda o currículo pelo sentido (experiências, tecnologias, nível real, formação, área) e defina de 4 a 6 palavras-chave de busca: cargos compatíveis, inclusive com nomes diferentes dos escritos no currículo, e tecnologias centrais.
-Passo 2: para cada portal da lista, busque no Google com essas palavras-chave e site:DOMINIO, procurando páginas individuais de vaga recentes (últimas semanas). Nunca use matérias, blogs ou listas genéricas.
-Passo 3: VERIFIQUE. Abra a página de cada vaga candidata com a ferramenta de leitura de URL. Só relate vagas cuja página você conseguiu abrir e que estão abertas. Preencha título, empresa, local, data e requisitos a partir da própria página, nunca só do resumo da busca. Se não conseguir abrir, descarte a vaga.
-Passo 4: dê compatibilidade de 0 a 100 (habilidades, nível, formação, local, remoto). Inclua só 70 ou mais, no máximo 2 por portal.
-Nunca invente vagas, empresas, datas nem links. Sem vaga verificada: found=false, e explique em summary (por exemplo, que o site bloqueia a leitura ou que nada compatível foi aberto).
-Responda APENAS com JSON, sem texto fora dele e sem blocos de código:
-{"keywords":["..."],"portals":{"DOMINIO":{"found":boolean,"summary":"1 frase em português","jobs":[{"title":"","company":"","location":"","posted":"","match":0,"why":"1 frase","url":"página da vaga"}]}}}`;
+const PLAN = `Você é um analista de carreira que entende currículos pelo sentido, não por palavras soltas.
+Analise o currículo e as preferências e responda APENAS com JSON neste formato:
+{"resumo":"2 frases sobre o perfil e o nível real da pessoa","nivel":"estagio|junior|pleno|senior",
+"cargos":[{"titulo":"cargo real do mercado brasileiro","compat":0,"motivo":"1 frase","busca":"termo curto de 2 a 5 palavras para pesquisar em portais de vagas"}],
+"palavras":["6 a 10 palavras-chave e tecnologias mais valorizadas no currículo"],
+"lacunas":["até 4 itens que aumentariam a compatibilidade"]}
+Regras: de 4 a 6 cargos, em ordem decrescente de compatibilidade (0 a 100), incluindo cargos com nomes diferentes dos escritos no currículo. Considere nível, formação, experiências, cidade e remoto. Seja honesto: não infle a compatibilidade e não invente experiências.`;
 
-const CHAT = `Você é um orientador de carreira, direto e gentil, que fala português do Brasil. Ajuda a pessoa a melhorar o currículo e a conseguir emprego: revisão de currículo, resumo profissional, palavras que faltam para as vagas, LinkedIn, portfólio e GitHub, carta de apresentação, preparação para entrevista, negociação e rotina de candidaturas.
-Regras: baseie-se no currículo e nas vagas fornecidos; dê passos concretos e exemplos de frases prontas; seja honesto sobre lacunas sem desanimar; nunca invente experiências que a pessoa não tem, e nunca prometa emprego. Responda em até 250 palavras, com listas curtas quando ajudar. Se faltar informação, faça no máximo uma pergunta.`;
+const CHAT = `Você é um orientador de carreira, direto e gentil, que fala português do Brasil. Ajuda a pessoa a melhorar o currículo e a conseguir emprego: revisão de currículo, resumo profissional, palavras que faltam, LinkedIn, portfólio e GitHub, carta de apresentação, entrevista, negociação e rotina de candidaturas.
+Regras: baseie-se no currículo e nos cargos indicados; dê passos concretos e exemplos de frases prontas; seja honesto sobre lacunas sem desanimar; nunca invente experiências que a pessoa não tem e nunca prometa emprego. Responda em até 250 palavras, com listas curtas quando ajudar. Se faltar informação, faça no máximo uma pergunta.`;
 
 const json = (o, s, h) => new Response(JSON.stringify(o), { status: s || 200, headers: { "Content-Type": "application/json", ...h } });
+const B = "https://generativelanguage.googleapis.com/v1beta";
 
-async function gemini(env, body, models, ms) {
-  let last;
-  for (const model of models) {
-    let b = { ...body, generationConfig: { ...(body.generationConfig || {}), thinkingConfig: model.includes("gemini-3") ? { thinkingLevel: "low" } : { thinkingBudget: 0 } } };
-    for (let t = 0; t < 2; t++) {
-      let r, d;
-      try {
-        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY || "" },
-          body: JSON.stringify(b),
-          signal: AbortSignal.timeout(ms),
-        });
-        d = await r.json().catch(() => ({}));
-      } catch (e) {
-        last = Object.assign(new Error("O Gemini demorou demais para responder. Tente de novo."), { status: 504 });
-        break;
-      }
-      if (r.ok) {
-        const parts = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
-        return parts.map((p) => p.text || "").join("");
-      }
-      if (r.status === 400 && b.tools && b.tools.some((x) => x.url_context)) {
-        b = { ...b, tools: b.tools.filter((x) => !x.url_context) }; // modelo sem leitura de página: tenta só com busca
-        continue;
-      }
-      const msg = (d.error && d.error.message) || "";
-      last = new Error(
-        r.status === 429 ? "Limite gratuito do Gemini atingido. Tente mais tarde ou amanhã."
-        : r.status === 503 ? "O Gemini está sobrecarregado agora. Tente de novo em alguns minutos."
-        : "Gemini (" + r.status + "): " + msg.slice(0, 160)
-      );
-      last.status = r.status === 429 ? 429 : 502;
-      if (![429, 500, 503].includes(r.status)) throw last;
-      break;
-    }
-  }
-  throw last;
+function apiErr(r, d) {
+  const msg = ((d && d.error && d.error.message) || "").slice(0, 140);
+  const e = new Error(r.status === 429 ? "Limite do Gemini atingido. Tente mais tarde ou amanhã."
+    : r.status === 503 ? "O Gemini está sobrecarregado agora. Tente de novo em alguns minutos."
+    : "Gemini (" + r.status + "): " + msg);
+  e.status = r.status === 429 ? 429 : 502;
+  return e;
+}
+const tmo = () => Object.assign(new Error("O Gemini demorou demais para responder. Tente de novo."), { status: 504 });
+
+// Tenta a API generateContent e, se o modelo não a aceitar (400/404), a API Interactions.
+async function gem(env, o) {
+  const model = env.MODEL || "gemini-3.8-flash";
+  const headers = { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY || "" };
+  const gc = { maxOutputTokens: o.max, thinkingConfig: model.includes("gemini-3") ? { thinkingLevel: "low" } : { thinkingBudget: 0 } };
+  if (o.json) gc.responseMimeType = "application/json";
+  let r, d, first = "";
+  try {
+    r = await fetch(`${B}/models/${model}:generateContent`, { method: "POST", headers, signal: AbortSignal.timeout(o.ms),
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: o.system }] }, contents: o.contents.map((c) => ({ role: c.role, parts: [{ text: c.text }] })), generationConfig: gc }) });
+    d = await r.json().catch(() => ({}));
+  } catch { throw tmo(); }
+  if (r.ok) {
+    const t = ((d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || []).map((p) => p.text || "").join("");
+    if (t) return t;
+  } else if (![400, 404].includes(r.status)) throw apiErr(r, d);
+  else first = apiErr(r, d).message;
+
+  const flat = o.system + "\n\n" + o.contents.map((c) => (c.role === "model" ? "Assistente: " : "Usuário: ") + c.text).join("\n");
+  try {
+    r = await fetch(`${B}/interactions`, { method: "POST", headers, signal: AbortSignal.timeout(o.ms), body: JSON.stringify({ model, input: flat }) });
+    d = await r.json().catch(() => ({}));
+  } catch { throw tmo(); }
+  if (!r.ok) { const e = apiErr(r, d); e.message = (first ? first + " | " : "") + e.message; throw e; }
+  const t = d.output_text || (d.steps || []).filter((s) => s.type === "model_output").flatMap((s) => s.content || []).map((c) => c.text || "").join("");
+  if (!t) throw new Error("Resposta vazia do Gemini.");
+  return t;
 }
 
 export default {
@@ -73,34 +71,25 @@ export default {
     const { mode, resume, profile = {} } = b;
     if (!resume || resume.length < 100) return json({ error: "Currículo ausente" }, 400, cors);
     const ctx = `CURRÍCULO:\n${String(resume).slice(0, 12000)}\n\nPREFERÊNCIAS:\n- Cidade: ${profile.city || "não informada"}\n- Aceita remoto: ${profile.remote ? "sim" : "não"}\n- Observações: ${profile.goal || "nenhuma"}`;
-    const main = env.MODEL || "gemini-3.8-flash";
-    const backup = env.FALLBACK_MODEL || ""; // opcional
 
     try {
       if (mode === "chat") {
-        const msgs = (b.messages || []).slice(-12).map((m) => ({ role: m.role === "model" ? "model" : "user", parts: [{ text: String(m.text).slice(0, 2000) }] }));
+        const msgs = (b.messages || []).slice(-12).map((m) => ({ role: m.role === "model" ? "model" : "user", text: String(m.text).slice(0, 2000) }));
         if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ error: "Mensagem ausente" }, 400, cors);
-        const jobs = (b.jobs || []).slice(0, 8).map((j) => "- " + j).join("\n");
-        const reply = await gemini(env, {
-          systemInstruction: { parts: [{ text: CHAT + "\n\n" + ctx + (jobs ? "\n\nVAGAS ENCONTRADAS:\n" + jobs : "") }] },
-          contents: msgs,
-          generationConfig: { maxOutputTokens: 1000 },
-        }, [env.CHAT_MODEL || main, backup].filter(Boolean), 45000);
-        return json({ reply: reply.trim() || "Não consegui formular uma resposta. Tente reformular." }, 200, cors);
+        const jobs = (b.jobs || []).slice(0, 8).map((j) => "- " + String(j).slice(0, 200)).join("\n");
+        const reply = await gem(env, { system: CHAT + "\n\n" + ctx + (jobs ? "\n\nCARGOS INDICADOS PELA ANÁLISE:\n" + jobs : ""), contents: msgs, max: 1000, ms: 45000 });
+        return json({ reply: reply.trim() }, 200, cors);
       }
-
-      const portals = (b.portals || []).slice(0, 3);
-      if (!portals.length) return json({ error: "Portais ausentes" }, 400, cors);
-      const text = await gemini(env, {
-        systemInstruction: { parts: [{ text: SEARCH }] },
-        contents: [{ role: "user", parts: [{ text: ctx + "\n\nPORTAIS:\n" + portals.map((p) => `- ${p.name}: site:${p.domain}`).join("\n") }] }],
-        tools: [{ google_search: {} }, { url_context: {} }],
-        generationConfig: { maxOutputTokens: 4096 },
-      }, [main, backup].filter(Boolean), 85000);
-      const m = text.match(/\{[\s\S]*\}/);
-      let out;
-      try { out = JSON.parse(m[0]); } catch { return json({ error: "A IA respondeu fora do formato esperado. Tente de novo." }, 502, cors); }
-      return json({ keywords: Array.isArray(out.keywords) ? out.keywords.slice(0, 8) : [], portals: out.portals || {} }, 200, cors);
+      if (mode === "plan") {
+        const text = await gem(env, { system: PLAN, contents: [{ role: "user", text: ctx }], json: true, max: 1800, ms: 60000 });
+        let out;
+        try { out = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); try { out = JSON.parse(m[0]); } catch { return json({ error: "A IA respondeu fora do formato esperado. Tente de novo." }, 502, cors); } }
+        const cargos = (Array.isArray(out.cargos) ? out.cargos : []).filter((c) => c && c.titulo && c.busca).slice(0, 6)
+          .map((c) => ({ titulo: String(c.titulo), compat: Math.max(0, Math.min(100, +c.compat || 0)), motivo: String(c.motivo || ""), busca: String(c.busca) }));
+        if (!cargos.length) return json({ error: "A IA não indicou cargos. Tente de novo." }, 502, cors);
+        return json({ resumo: String(out.resumo || ""), nivel: String(out.nivel || ""), cargos, palavras: (out.palavras || []).slice(0, 10).map(String), lacunas: (out.lacunas || []).slice(0, 4).map(String) }, 200, cors);
+      }
+      return json({ error: "Modo inválido" }, 400, cors);
     } catch (e) {
       return json({ error: e.message || "Erro inesperado" }, e.status || 502, cors);
     }
