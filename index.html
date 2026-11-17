@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Radar de Vagas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0d0f24;--sf:#161a3a;--sf2:#1e2350;--ink:#eceefb;--mute:#9ea4cf;--line:#2c3270;--acc:#8b7cf6;--acc2:#5b6cf0;--ok:#6fd8b4;--okbg:#12363a;--bad:#f09aa5;--badbg:#3b2038}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(900px 500px at 85% -10%,#262a66 0,transparent 60%),var(--bg);color:var(--ink);font:400 19px/1.55 "EB Garamond",Garamond,Georgia,serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);min-height:100vh}
+main{max-width:980px;margin:0 auto;padding:26px 18px 70px}
+.brand{font-size:30px;font-weight:700;margin:0}.brand span{color:var(--acc)}
+nav{display:flex;gap:8px;margin:20px 0 30px;border-bottom:1px solid var(--line);overflow-x:auto}
+nav a{color:var(--mute);text-decoration:none;padding:10px 16px;border-bottom:3px solid transparent;font-weight:500;white-space:nowrap}
+nav a.on{color:var(--ink);border-color:var(--acc);font-weight:700}
+nav a.off{opacity:.4;pointer-events:none}
+h1{font-size:clamp(30px,5vw,42px);line-height:1.1;margin:0 0 10px;font-weight:600}
+p{margin:0 0 12px}.mute{color:var(--mute)}.sm{font-size:16px}
+.card{background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+label{display:block;font-weight:600;margin-bottom:14px}
+label>input[type=text],label>textarea{margin-top:6px;font-weight:400}
+input[type=text],textarea{width:100%;font:inherit;font-size:18px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+textarea{min-height:150px;resize:vertical}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc);vertical-align:-3px;margin-right:8px}
+.chk{font-weight:400}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.btn{font:inherit;font-weight:700;border:0;background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff;padding:12px 22px;border-radius:9px;cursor:pointer;text-decoration:none;display:inline-block}
+.btn.g{background:none;border:1px solid var(--line);color:var(--ink)}
+.drop{display:block;border:1px dashed var(--acc);border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:var(--sf2);margin-bottom:14px;font-weight:500}
+.drop input{display:none}
+.pr{display:flex;align-items:center;gap:16px;padding:16px 18px;background:var(--sf);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+.logo{position:relative;flex:none;width:46px;height:46px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden}
+.logo b{color:#2b2f6b;font-size:22px}.logo img{position:absolute;inset:7px;width:32px;height:32px;object-fit:contain;background:#fff}
+.info{flex:1;min-width:0}.info strong{font-size:20px}.info .sm{margin:2px 0 0}
+.badge{flex:none;font-size:16px;font-weight:600;padding:5px 13px;border-radius:99px;background:var(--sf2);color:var(--mute);white-space:nowrap}
+.badge.ok{background:var(--okbg);color:var(--ok)}.badge.bad{background:var(--badbg);color:var(--bad)}.badge.run{color:var(--acc)}
+.bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0 24px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc2),var(--acc));width:0;transition:width .3s}
+.top{display:flex;justify-content:space-between;gap:14px}
+.job h3{margin:0;font-size:22px;line-height:1.2}
+.pct{font-size:34px;font-weight:700;color:var(--ok);line-height:1}
+.err{padding:12px 14px;border:1px solid var(--bad);border-radius:9px;color:var(--bad);background:var(--badbg);margin-bottom:14px}
+.empty{padding:26px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--mute)}
+@media (max-width:560px){.pr{flex-wrap:wrap}.badge{margin-left:62px}}
+.chat #msgs{max-height:52vh;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+.bb{max-width:88%;padding:11px 15px;border-radius:14px;line-height:1.5}
+.bb.a{background:var(--sf2);align-self:flex-start;border-top-left-radius:4px}
+.bb.u{background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff;align-self:flex-end;border-top-right-radius:4px}
+.sug{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.sug .btn{padding:7px 13px;font-size:16px;font-weight:500}
+.qrow{display:flex;gap:10px;align-items:flex-end}.qrow textarea{min-height:56px;height:56px}
+.btn:disabled{opacity:.5;cursor:default}
+</style>
+</head>
+<body>
+<main>
+<p class="brand">Radar de <span>Vagas</span></p>
+<nav id="nav"><a href="#/perfil" data-p="perfil">1. Perfil</a><a href="#/portais" data-p="portais" class="off">2. Portais</a><a href="#/vagas" data-p="vagas" class="off">3. Vagas compatíveis</a><a href="#/assistente" data-p="assistente" class="off">4. Assistente</a></nav>
+
+<section id="perfil">
+<h1>Seu currículo e seu perfil</h1>
+<p class="mute">A inteligência artificial lê o seu currículo e procura vagas que combinam com você, mesmo quando o cargo tem outro nome.</p>
+<div id="e1"></div>
+<div class="card">
+<label class="drop"><input type="file" id="file" accept=".pdf,.txt,application/pdf,text/plain"><span id="fn">Clique para enviar o currículo (PDF ou TXT)</span></label>
+<label>Ou cole o texto do currículo<textarea id="cv"></textarea></label>
+<label>Cidade e estado<input type="text" id="city" placeholder="Ex.: Vila Velha, ES"></label>
+<label class="chk"><input type="checkbox" id="remote" checked>Aceito trabalhar remotamente</label>
+<label>O que você procura (opcional)<textarea id="goal" style="min-height:80px" placeholder="Ex.: quero migrar para dados, prefiro CLT, tenho inglês intermediário…"></textarea></label>
+<button class="btn" id="go">Buscar vagas</button>
+</div>
+</section>
+
+<section id="portais" hidden>
+<h1>Portais de vagas</h1>
+<p class="mute" id="pmsg"></p>
+<div class="bar"><i id="pb"></i></div>
+<div id="plist"></div>
+<div style="margin-top:18px"><a class="btn" href="#/vagas">Ver vagas compatíveis</a></div>
+</section>
+
+<section id="vagas" hidden>
+<h1>Vagas compatíveis</h1>
+<p class="mute">Somente vagas com 70% ou mais de compatibilidade com o seu perfil, da maior para a menor.</p>
+<div id="vlist"></div>
+<div style="margin-top:18px"><a class="btn g" href="#/perfil">Ajustar perfil e buscar de novo</a></div>
+</section>
+<section id="assistente" hidden>
+<h1>Assistente de carreira</h1>
+<p class="mute">Converse com a IA sobre o seu currículo e sobre como conseguir o emprego. Ela usa o seu currículo e as vagas encontradas.</p>
+<div class="card chat">
+<div id="msgs"><div class="bb a">Olá! Posso revisar o seu currículo, sugerir melhorias para as vagas encontradas e ajudar com entrevista, LinkedIn e candidaturas. Por onde quer começar?</div></div>
+<div class="sug"><button class="btn g" data-s="Revise meu currículo e diga os 5 pontos que mais devo melhorar, com exemplos de como reescrever.">Revisar meu currículo</button><button class="btn g" data-s="Quais habilidades ou palavras estão faltando no meu currículo para as vagas que encontrei?">O que falta para as vagas</button><button class="btn g" data-s="Monte um plano de 2 semanas para eu me candidatar com mais chance de ser chamado.">Plano de candidaturas</button><button class="btn g" data-s="Me prepare para entrevista: quais perguntas devo esperar e como respondo?">Preparar entrevista</button></div>
+<div class="qrow"><textarea id="q" placeholder="Escreva sua pergunta…" aria-label="Sua pergunta"></textarea><button class="btn" id="send">Enviar</button></div>
+</div>
+</section>
+</main>
+
+<script>
+var API_URL="https://radar-vagas.davimartilio369.workers.dev/";
+var PT=[["Indeed","br.indeed.com"],["LinkedIn","linkedin.com"],["Gupy","gupy.io"],["Catho","catho.com.br"],["Jobbol","jobbol.com.br"],["InfoJobs","infojobs.com.br"],["Vagas.com","vagas.com.br"],["BNE","bne.com.br"],["Glassdoor","glassdoor.com.br"],["Programathor","programathor.com.br"],["Geekhunter","geekhunter.com.br"],["Revelo","revelo.com.br"],["Trampos.co","trampos.co"],["Remotar","remotar.com.br"]];
+var $=function(i){return document.getElementById(i)};
+function esc(s){var d=document.createElement("div");d.textContent=s==null?"":s;return d.innerHTML}
+var S={res:{},started:false,done:0};
+try{var sv=JSON.parse(localStorage.getItem("rv-perfil")||"null");if(sv){$("cv").value=sv.cv||"";$("city").value=sv.city||"";$("remote").checked=sv.remote!==false;$("goal").value=sv.goal||""}}catch(e){}
+function profile(){return{cv:$("cv").value.trim(),city:$("city").value.trim(),remote:$("remote").checked,goal:$("goal").value.trim()}}
+function save(){try{localStorage.setItem("rv-perfil",JSON.stringify(profile()))}catch(e){}}
+
+function ready(){return $("cv").value.trim().length>=100}
+function setNav(p){[].forEach.call($("nav").children,function(a){var k=a.getAttribute("data-p"),off=k==="perfil"?false:k==="assistente"?!ready():!S.started;a.className=(k===p?"on":"")+(off?" off":"")})}
+function route(){var p=(location.hash.replace("#/","")||"perfil");if(["perfil","portais","vagas","assistente"].indexOf(p)<0)p="perfil";if((p==="portais"||p==="vagas")&&!S.started)p="perfil";if(p==="assistente"&&!ready())p="perfil";
+["perfil","portais","vagas","assistente"].forEach(function(x){$(x).hidden=x!==p});setNav(p);
+if(p==="vagas")drawVagas();window.scrollTo(0,0)}
+$("cv").addEventListener("input",function(){setNav((location.hash.replace("#/","")||"perfil"))});
+window.addEventListener("hashchange",route);
+
+$("file").onchange=function(){var f=this.files[0];if(!f)return;$("fn").textContent="Lendo "+f.name+"…";
+function ok(t){$("cv").value=t;$("fn").textContent="Currículo carregado: "+f.name}
+if(/\.txt$/i.test(f.name)){f.text().then(ok);return}
+if(!window.pdfjsLib){$("fn").textContent="Leitor de PDF indisponível. Cole o texto abaixo.";return}
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+f.arrayBuffer().then(function(b){return pdfjsLib.getDocument({data:b}).promise}).then(function(pdf){var ps=[];for(var i=1;i<=pdf.numPages;i++)ps.push(pdf.getPage(i).then(function(p){return p.getTextContent()}).then(function(c){return c.items.map(function(x){return x.str+(x.hasEOL?"\n":" ")}).join("")}));return Promise.all(ps)}).then(function(a){var t=a.join("\n");if(t.trim().length<30)throw 0;ok(t)}).catch(function(){$("fn").textContent="Não consegui ler esse PDF (talvez seja imagem). Cole o texto abaixo."})};
+
+$("go").onclick=function(){var p=profile(),e=$("e1");e.innerHTML="";
+if(p.cv.length<100){e.innerHTML='<div class="err">Envie o currículo ou cole o texto completo para continuar.</div>';return}
+if(/COLE_AQUI/.test(API_URL)){e.innerHTML='<div class="err">A busca com IA ainda não foi ligada. Siga o passo a passo do README para criar o servidor e colar o endereço em API_URL.</div>';return}
+save();S={res:{},started:true,done:0};PT.forEach(function(x){S.res[x[1]]={st:"wait"}});drawPortais();location.hash="#/portais";route();run(p)};
+
+function call(b){return fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).catch(function(){throw new Error("Sem conexão com o servidor. Confira o API_URL e o ALLOWED_ORIGIN, e abra a página pelo endereço do GitHub Pages, não como arquivo local.")}).then(function(r){return r.json().catch(function(){return{}}).then(function(d){if(!r.ok)throw new Error(d.error||"Erro "+r.status);return d})})}
+function run(p){var q=[];for(var i=0;i<PT.length;i+=5)q.push(PT.slice(i,i+5));
+function next(){if(!q.length)return;var g=q.shift();g.forEach(function(x){S.res[x[1]]={st:"run"}});drawPortais();
+call({mode:"search",resume:p.cv,profile:{city:p.city,remote:p.remote,goal:p.goal},portals:g.map(function(x){return{name:x[0],domain:x[1]}})})
+.then(function(d){g.forEach(function(x){var o=(d.portals||{})[x[1]];if(!o){S.res[x[1]]={st:"err",msg:"A IA não respondeu sobre este portal."};return}var j=(o.jobs||[]).filter(function(v){return v.match>=70});S.res[x[1]]={st:j.length?"ok":"no",jobs:j,sum:o.summary||""}})})
+.catch(function(e){g.forEach(function(x){S.res[x[1]]={st:"err",msg:e.message}})})
+.then(function(){S.done+=g.length;drawPortais();if(!$("vagas").hidden)drawVagas();setTimeout(next,5000)})}
+next()}
+
+function logo(x){return'<span class="logo"><b>'+esc(x[0].charAt(0))+'</b><img alt="" src="https://www.google.com/s2/favicons?domain='+x[1]+'&sz=64" onerror="this.remove()"></span>'}
+function drawPortais(){var n=PT.length,d=S.done,tot=0;$("pb").style.width=(100*d/n)+"%";
+PT.forEach(function(x){var r=S.res[x[1]];if(r&&r.jobs)tot+=r.jobs.length});
+$("pmsg").textContent=d<n?"Analisando um portal por vez, pode levar alguns minutos… "+d+" de "+n+" concluídos.":"Busca concluída. "+tot+(tot===1?" vaga compatível encontrada.":" vagas compatíveis encontradas.");
+$("plist").innerHTML=PT.map(function(x){var r=S.res[x[1]]||{st:"wait"},b,t="";
+if(r.st==="ok"){b='<span class="badge ok">Há vaga compatível ('+r.jobs.length+')</span>';t=r.sum}
+else if(r.st==="no"){b='<span class="badge">Nenhuma vaga compatível</span>';t=r.sum}
+else if(r.st==="err"){b='<span class="badge bad">Não foi possível verificar</span>';t=r.msg||""}
+else if(r.st==="run"){b='<span class="badge run">Analisando…</span>'}
+else b='<span class="badge">Na fila</span>';
+return'<div class="pr">'+logo(x)+'<div class="info"><strong>'+esc(x[0])+'</strong><p class="sm mute">'+esc(t||x[1])+'</p></div>'+b+'</div>'}).join("")}
+
+function drawVagas(){var all=[];PT.forEach(function(x){var r=S.res[x[1]];if(r&&r.jobs)r.jobs.forEach(function(j){all.push({j:j,p:x})})});
+all.sort(function(a,b){return b.j.match-a.j.match});
+$("vlist").innerHTML=all.length?all.map(function(v){var j=v.j;return'<article class="card job"><div class="top"><div><h3>'+esc(j.title)+'</h3><p class="sm mute" style="margin:4px 0 0">'+esc(j.company)+' · '+esc(j.location||"Local não informado")+' · '+esc(j.posted||"data não informada")+'</p></div><div class="pct">'+esc(j.match)+'%</div></div><p style="margin:12px 0 8px">'+esc(j.why)+'</p><div class="sm mute" style="display:flex;gap:12px;align-items:center">'+logo(v.p)+'<span>Encontrada em '+esc(v.p[0])+(/^https:\/\//.test(j.url||"")?' · <a style="color:var(--acc)" target="_blank" rel="noopener" href="'+esc(j.url)+'">ver no site</a>':"")+'</span></div></article>'}).join(""):'<div class="empty">'+(S.done<PT.length?"A busca ainda está em andamento. Volte em instantes.":"Nenhum portal tem vaga com 70% ou mais para o seu perfil agora.")+'</div>'}
+var H=[];
+function mdr(t){return esc(t).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/^\s*[-*] /gm,"• ").replace(/\n/g,"<br>")}
+function bub(r,t){var d=document.createElement("div");d.className="bb "+r;d.innerHTML=r==="u"?esc(t):mdr(t);$("msgs").appendChild(d);d.scrollIntoView({block:"end"});return d}
+function ask(t){t=(t||"").trim();if(!t||$("send").disabled)return;if(/COLE_AQUI/.test(API_URL)){bub("a","A IA ainda não foi ligada. Siga o README para colar o API_URL.");return}
+var p=profile(),jobs=[];PT.forEach(function(x){var r=S.res[x[1]];if(r&&r.jobs)r.jobs.forEach(function(j){jobs.push(j.title+" — "+j.company+" ("+x[0]+", "+j.match+"%)")})});
+H.push({role:"user",text:t});bub("u",t);$("q").value="";$("send").disabled=true;var th=bub("a","Pensando…");
+call({mode:"chat",resume:p.cv,profile:{city:p.city,remote:p.remote,goal:p.goal},jobs:jobs,messages:H.slice(-12)})
+.then(function(d){th.remove();H.push({role:"model",text:d.reply});bub("a",d.reply)})
+.catch(function(e){th.remove();H.pop();bub("a","Não consegui responder: "+e.message)})
+.then(function(){$("send").disabled=false})}
+$("send").onclick=function(){ask($("q").value)};
+$("q").addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();ask($("q").value)}});
+[].forEach.call(document.querySelectorAll(".sug button"),function(b){b.onclick=function(){ask(b.getAttribute("data-s"))}});
+route();
+</script>
+</body>
+</html>
