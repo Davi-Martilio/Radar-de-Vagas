@@ -73,8 +73,8 @@ export default {
     const { mode, resume, profile = {} } = b;
     if (!resume || resume.length < 100) return json({ error: "Currículo ausente" }, 400, cors);
     const ctx = `CURRÍCULO:\n${String(resume).slice(0, 12000)}\n\nPREFERÊNCIAS:\n- Cidade: ${profile.city || "não informada"}\n- Aceita remoto: ${profile.remote ? "sim" : "não"}\n- Observações: ${profile.goal || "nenhuma"}`;
-    const main = env.MODEL || "gemini-2.5-flash";
-    const lite = env.FALLBACK_MODEL || "gemini-2.5-flash-lite";
+    const main = env.MODEL || "gemini-3.8-flash";
+    const lite = env.FALLBACK_MODEL || "gemini-3.8-flash-lite";
 
     try {
       if (mode === "chat") {
