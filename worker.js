@@ -1,6 +1,6 @@
 // Cloudflare Worker — ponte entre a página e a API gratuita do Google Gemini.
 // Variáveis: GEMINI_API_KEY (secret), ALLOWED_ORIGIN (várias separadas por vírgula),
-// MODEL, FALLBACK_MODEL, CHAT_MODEL (opcionais).
+// MODEL (padrão gemini-3.8-flash), FALLBACK_MODEL, CHAT_MODEL (opcionais).
 
 const SEARCH = `Você é um recrutador sênior que avalia currículos e verifica vagas reais.
 Passo 1: entenda o currículo pelo sentido (experiências, tecnologias, nível real, formação, área) e defina de 4 a 6 palavras-chave de busca: cargos compatíveis, inclusive com nomes diferentes dos escritos no currículo, e tecnologias centrais.
@@ -19,7 +19,7 @@ const json = (o, s, h) => new Response(JSON.stringify(o), { status: s || 200, he
 async function gemini(env, body, models, ms) {
   let last;
   for (const model of models) {
-    let b = body;
+    let b = { ...body, generationConfig: { ...(body.generationConfig || {}), thinkingConfig: model.includes("gemini-3") ? { thinkingLevel: "low" } : { thinkingBudget: 0 } } };
     for (let t = 0; t < 2; t++) {
       let r, d;
       try {
@@ -74,7 +74,7 @@ export default {
     if (!resume || resume.length < 100) return json({ error: "Currículo ausente" }, 400, cors);
     const ctx = `CURRÍCULO:\n${String(resume).slice(0, 12000)}\n\nPREFERÊNCIAS:\n- Cidade: ${profile.city || "não informada"}\n- Aceita remoto: ${profile.remote ? "sim" : "não"}\n- Observações: ${profile.goal || "nenhuma"}`;
     const main = env.MODEL || "gemini-3.8-flash";
-    const lite = env.FALLBACK_MODEL || "gemini-3.8-flash-lite";
+    const backup = env.FALLBACK_MODEL || ""; // opcional
 
     try {
       if (mode === "chat") {
@@ -84,19 +84,19 @@ export default {
         const reply = await gemini(env, {
           systemInstruction: { parts: [{ text: CHAT + "\n\n" + ctx + (jobs ? "\n\nVAGAS ENCONTRADAS:\n" + jobs : "") }] },
           contents: msgs,
-          generationConfig: { temperature: 0.6, maxOutputTokens: 1000, thinkingConfig: { thinkingBudget: 0 } },
-        }, [env.CHAT_MODEL || lite, main], 20000);
+          generationConfig: { maxOutputTokens: 1000 },
+        }, [env.CHAT_MODEL || main, backup].filter(Boolean), 45000);
         return json({ reply: reply.trim() || "Não consegui formular uma resposta. Tente reformular." }, 200, cors);
       }
 
-      const portals = (b.portals || []).slice(0, 4);
+      const portals = (b.portals || []).slice(0, 3);
       if (!portals.length) return json({ error: "Portais ausentes" }, 400, cors);
       const text = await gemini(env, {
         systemInstruction: { parts: [{ text: SEARCH }] },
         contents: [{ role: "user", parts: [{ text: ctx + "\n\nPORTAIS:\n" + portals.map((p) => `- ${p.name}: site:${p.domain}`).join("\n") }] }],
         tools: [{ google_search: {} }, { url_context: {} }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
-      }, [main, lite], 40000);
+        generationConfig: { maxOutputTokens: 4096 },
+      }, [main, backup].filter(Boolean), 85000);
       const m = text.match(/\{[\s\S]*\}/);
       let out;
       try { out = JSON.parse(m[0]); } catch { return json({ error: "A IA respondeu fora do formato esperado. Tente de novo." }, 502, cors); }
